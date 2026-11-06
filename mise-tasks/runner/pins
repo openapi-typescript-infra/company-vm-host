@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#MISE description="Diff versions.env against what your-org/your-app declares (args: [--offline] [checkout, default ../../mobile-apps]); exits 1 on drift"
+# Runs locally - it reads a mobile-apps checkout, not the runner host - so it
+# skips _lib.sh and its GHRUNNER_* host selection on purpose.
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
+
+MANIFEST=versions.env
+derived="$(mktemp)"
+trap 'rm -f "$derived"' EXIT
+./derive-versions.sh "$@" > "$derived"
+
+pin() { sed -n "s/^$1=//p" "$MANIFEST" | tail -1; }
+
+# Numeric dotted compare, so 2.10.0 >= 2.5.1 (string compare gets that wrong).
+version_at_least() { # <actual> <minimum>
+  local IFS=. a r i
+  read -ra a <<<"$1"; read -ra r <<<"$2"
+  for i in 0 1 2 3; do
+    (( ${a[i]:-0} > ${r[i]:-0} )) && return 0
+    (( ${a[i]:-0} < ${r[i]:-0} )) && return 1
+  done
+  return 0
+}
+
+drift=0
+printf '%-26s %-16s %-16s %s\n' KEY versions.env mobile-apps STATUS
+while IFS='=' read -r key val; do
+  [[ -n "$key" && "$key" != \#* ]] || continue
+  case "$key" in
+    *_MIN_VERSION)
+      pinkey="${key%_MIN_VERSION}_VERSION"
+      have="$(pin "$pinkey")"
+      if [[ "$val" == UNRESOLVED ]]; then
+        status="? minimum unresolved"
+      elif [[ -z "$have" ]]; then
+        status="MISSING $pinkey in $MANIFEST"; drift=1
+      elif version_at_least "$have" "$val"; then
+        status="ok (pin >= minimum)"
+      else
+        status="BELOW MINIMUM"; drift=1
+      fi
+      printf '%-26s %-16s %-16s %s\n' "$pinkey" "$have" ">= $val" "$status"
+      ;;
+    *)
+      have="$(pin "$key")"
+      if [[ "$val" == UNRESOLVED ]]; then
+        status="? could not derive (see stderr)"; drift=1
+      elif [[ -z "$have" ]]; then
+        status="MISSING in $MANIFEST"; drift=1
+      elif [[ "$have" == "$val" ]]; then
+        status=ok
+      else
+        status=DRIFT; drift=1
+      fi
+      printf '%-26s %-16s %-16s %s\n' "$key" "${have:--}" "$val" "$status"
+      ;;
+  esac
+done < "$derived"
+
+echo
+if (( drift )); then
+  echo "versions.env disagrees with mobile-apps. Edit it deliberately (a moved pin needs a"
+  echo "BAKE_IMAGE_NAME bump + re-bake, and for MAESTRO_VERSION a suite run); nothing is auto-bumped."
+  exit 1
+fi
+echo "versions.env matches mobile-apps ($(sed -n '1s/^# derived from //p' "$derived"))."

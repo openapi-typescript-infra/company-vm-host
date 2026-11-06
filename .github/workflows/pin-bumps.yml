@@ -1,0 +1,58 @@
+# Weekly PR moving the host tool pins (actions/runner, apple/container, tart,
+# lima) to their latest upstream releases. Dependabot cannot see them: they
+# live in env files and shell defaults, not in a package manifest.
+#
+# Why weekly: GitHub refuses runners more than a few releases behind ("Runner
+# version vX is deprecated and cannot receive messages"), which idled both
+# the runner host macvm slots on 2026-09-28 until RUNNER_VERSION moved. Merging the PR
+# changes nothing on a host until it is provisioned; see the PR body.
+name: Pin bumps
+
+on:
+  schedule:
+    - cron: '0 13 * * 1' # Mondays, 09:00 America/New_York (08:00 in winter)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pin-bumps
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Move the pins to the latest releases
+        id: pins
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./check-pins.sh --apply | tee "$RUNNER_TEMP/pins.txt"
+          {
+            echo 'Weekly bump of the host tool pins to their latest upstream releases.'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/pins.txt"
+            echo '```'
+            echo
+            echo 'After merging, provision each host for the change to take effect:'
+            echo
+            echo '- `RUNNER_VERSION` lands on the next provision; GitHub stops delivering jobs to runners a few releases behind, so do not sit on this one.'
+            echo '- `TART_VERSION` swaps the tart bundle and is refused while any macOS VM is running: provision after the warm window closes.'
+            echo '- `CONTAINER_VERSION` and `LIMA_VERSION` only act on hosts with Linux slots enabled.'
+          } > "$RUNNER_TEMP/body.md"
+          echo "body=$RUNNER_TEMP/body.md" >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          branch: deps/host-tool-pins
+          delete-branch: true
+          commit-message: 'chore(deps): bump host tool pins'
+          title: 'chore(deps): bump host tool pins'
+          body-path: ${{ steps.pins.outputs.body }}
+          labels: dependencies

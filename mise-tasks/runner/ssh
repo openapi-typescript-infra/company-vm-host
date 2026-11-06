@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Interactive shell on the runner host (args run as a command instead)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+if (( $# )); then rsh "$@"; else ssh -t "$TARGET"; fi

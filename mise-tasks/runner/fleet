@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#MISE description="List this org's runners as GitHub sees them (needs gh, runs locally)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+command -v gh >/dev/null || { echo "gh not installed" >&2; exit 1; }
+org="$(cfg GH_ORG)"
+prefix="$(cfg RUNNER_NAME_PREFIX)"
+echo "runners in org ${org} (this host registers as ${prefix:-<hostname>}-*):"
+# Ephemeral JIT runners only appear while idle-waiting or busy, so an empty
+# list is normal between jobs.
+gh api "/orgs/${org}/actions/runners?per_page=100" \
+  --jq '.runners[] | "\(.status)\t\(.busy | if . then "busy" else "idle" end)\t\(.name)"' \
+  2>/dev/null | sort || echo "  (none registered right now - normal between jobs)"

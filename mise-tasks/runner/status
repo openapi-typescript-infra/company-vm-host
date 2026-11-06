@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#MISE description="One-screen overview: config, slot daemons, VMs, disk"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+echo "== config (${CONFIG}) =="
+printf '  host:   %s\n' "$TARGET"
+printf '  org:    %s  group %s\n' "$(cfg GH_ORG)" "$(cfg RUNNER_GROUP_ID)"
+printf '  slots:  mac=%s linux=%s linuxamd64=%s linuxvm=%s linuxvmamd64=%s macvm=%s\n' \
+  "$(cfg MAC_RUNNERS)" "$(cfg LINUX_RUNNERS)" "$(cfg LINUX_AMD64_RUNNERS)" \
+  "$(cfg LINUXVM_RUNNERS)" "$(cfg LINUXVM_AMD64_RUNNERS)" "$(cfg MACVM_RUNNERS)"
+printf '  macvm:  %s  bridge=%s\n' "$(cfg MACVM_IMAGE)" "$(cfg MACVM_BRIDGE_IFACE || echo '<nat>')"
+
+ssh -o ConnectTimeout=10 "$TARGET" 'bash -s' <<'REMOTE'
+set -uo pipefail
+echo
+echo "== slot daemons =="
+sudo launchctl list 2>/dev/null | grep com.ghrunner \
+  || echo "  none loaded (host disabled, or never provisioned)"
+
+echo
+echo "== tart VMs =="
+sudo launchctl asuser "$(id -u _ghtart)" sudo -u _ghtart -H /usr/local/bin/tart list 2>/dev/null \
+  | grep -v '@sha256:' || echo "  tart not installed"
+
+echo
+echo "== disk =="
+df -h / | tail -1 | awk '{printf "  %s used of %s, %s free (%s)\n", $3, $2, $4, $5}'
+REMOTE

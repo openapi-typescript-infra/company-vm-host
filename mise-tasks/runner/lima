@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Run limactl on the runner host as _ghlima (e.g. mise run runner:lima list)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+as_service_user _ghlima /usr/local/lima/bin/limactl "$@"

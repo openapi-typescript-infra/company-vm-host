@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Bake the custom macOS image (default dir mobile-bake; BAKE_DIR=ios-bake for the Android-free one; detached)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+cd "$REPO_ROOT"
+exec ./bake-image.sh -b -d "${BAKE_DIR:-mobile-bake}" "$TARGET"

@@ -1,0 +1,12 @@
+# Admin conveniences for driving a provisioned runner host. The tasks live
+# in mise-tasks/; run `mise tasks` to list them.
+#
+# Everything targets one host, selected by these three variables. Override
+# them per-invocation for a second host, e.g.
+#   GHRUNNER_ENV=otherbox GHRUNNER_HOST=other-runner.example.com mise run status
+[env]
+# Which envs/<name>.env to read slot counts, org and image from.
+GHRUNNER_ENV = "example"
+# How to reach that host over SSH.
+GHRUNNER_HOST = "runner.example.com"
+GHRUNNER_USER = "runner"

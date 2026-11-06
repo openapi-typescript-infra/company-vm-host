@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Run container on the runner host as _ghcontainer (e.g. mise run runner:container ls)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+as_service_user _ghcontainer /usr/local/bin/container "$@"

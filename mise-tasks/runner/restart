@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Force-restart a slot daemon, e.g. mise run runner:restart macvm-1 (interrupts its job)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+(( $# == 1 )) || { echo "usage: mise run runner:restart <slot>   (e.g. macvm-1, mac-1, linux-2)" >&2; exit 2; }
+rsh "sudo launchctl kickstart -k system/com.ghrunner.${1}" && echo "kickstarted com.ghrunner.${1}"

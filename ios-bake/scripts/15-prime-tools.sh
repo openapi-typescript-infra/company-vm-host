@@ -1,0 +1,1 @@
+../../mobile-bake/scripts/15-prime-tools.sh

@@ -1,0 +1,13 @@
+#!/bin/bash
+# React Native invokes this wrapper from its configured application root. Use
+# Node's own resolver so Yarn workspaces and hoisted node_modules layouts find
+# the exact hermes-compiler version selected by the application lockfile.
+set -euo pipefail
+
+package_json="$(node --print "require.resolve('hermes-compiler/package.json')" 2>/dev/null)" \
+  || { echo "hermesc-rosetta: could not resolve hermes-compiler/package.json from $PWD" >&2; exit 1; }
+compiler="$(dirname "$package_json")/hermesc/linux64-bin/hermesc"
+[[ -x "$compiler" ]] \
+  || { echo "hermesc-rosetta: Linux x64 Hermes compiler not found at $compiler" >&2; exit 1; }
+
+exec "$compiler" "$@"

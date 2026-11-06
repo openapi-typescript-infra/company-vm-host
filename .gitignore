@@ -1,0 +1,3 @@
+host-service/*.local.json
+host-service/state/
+node_modules/

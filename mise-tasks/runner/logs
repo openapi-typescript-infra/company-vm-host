@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Follow a slot log, e.g. mise run runner:logs macvm-1 (no arg: list the logs)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+if (( $# == 0 )); then
+  echo "slot logs on ${GHRUNNER_HOST} (pass one, without .log, to follow it):"
+  rsh 'ls -1 /var/ghrunner/log/*.log 2>/dev/null | xargs -n1 basename' | sed 's/\.log$/  /'
+  exit 0
+fi
+# 644 under a 755 dir, so no sudo needed to read them.
+rsh "tail -n 100 -f /var/ghrunner/log/${1}.log"

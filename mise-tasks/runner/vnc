@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#MISE description="Tunnel Screen Sharing to a running macVM slot, e.g. mise run runner:vnc 1"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+idx="${1:-1}"
+[[ "$idx" =~ ^[1-9][0-9]*$ ]] || {
+  echo "usage: mise run runner:vnc [slot-number] [local-port]" >&2
+  exit 2
+}
+local_port="${2:-$((5900 + idx))}"
+if [[ ! "$local_port" =~ ^[0-9]+$ ]]; then
+  echo "local port must be between 1 and 65535" >&2
+  exit 2
+fi
+local_port=$((10#$local_port))
+if (( local_port <= 0 || local_port >= 65536 )); then
+  echo "local port must be between 1 and 65535" >&2
+  exit 2
+fi
+
+vm="ghrunner-vm-${idx}"
+ip="$(ssh -T -o ConnectTimeout=10 "$TARGET" "bash -s -- '$vm'" <<'REMOTE'
+set -euo pipefail
+vm="$1"
+T() { sudo launchctl asuser "$(id -u _ghtart)" sudo -u _ghtart -H /usr/local/bin/tart "$@"; }
+for resolver in agent dhcp arp; do
+  out="$(T ip "$vm" --resolver "$resolver" 2>/dev/null)" || continue
+  if [[ "$out" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$out" != 169.254.* ]]; then
+    printf '%s\n' "$out"
+    exit 0
+  fi
+done
+echo "${vm} is not running or has no usable address" >&2
+exit 1
+REMOTE
+)"
+
+printf 'Opening Screen Sharing tunnel for %s (%s) at vnc://localhost:%s\n' \
+  "$vm" "$ip" "$local_port"
+echo "Keep this process running; press Ctrl-C to close the tunnel."
+exec ssh -o ConnectTimeout=10 -o ExitOnForwardFailure=yes -N \
+  -L "127.0.0.1:${local_port}:${ip}:5900" "$TARGET"

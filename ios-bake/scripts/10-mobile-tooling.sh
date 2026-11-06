@@ -1,0 +1,1 @@
+../../mobile-bake/scripts/10-mobile-tooling.sh

@@ -1,0 +1,1 @@
+../../mobile-bake/scripts/05-distrust-emudhra.sh

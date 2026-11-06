@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#MISE description="Show running macOS VMs with their address and Screen Sharing URL"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+
+# One ssh round trip: resolving each VM separately would be several.
+# stdin carries the script, so no -t here.
+nat=0
+[[ -n "$(cfg MACVM_BRIDGE_IFACE)" ]] || nat=1
+ssh -o ConnectTimeout=10 "$TARGET" "bash -s -- '$nat'" <<'REMOTE'
+set -uo pipefail
+nat="$1"
+T() { sudo launchctl asuser "$(id -u _ghtart)" sudo -u _ghtart -H /usr/local/bin/tart "$@"; }
+
+vms="$(T list 2>/dev/null | awk 'NR > 1 && $NF == "running" { print $2 }')"
+if [[ -z "$vms" ]]; then
+  echo "no tart VMs running"
+  exit 0
+fi
+
+printf '%-20s %-16s %-34s %s\n' VM ADDRESS NAME "SCREEN SHARING"
+for vm in $vms; do
+  ip=""
+  # Prefer the guest agent and NAT lease over ARP. ARP can retain a bridged
+  # guest's old 169.254/16 fallback after the slot has moved to NAT.
+  for r in agent dhcp arp; do
+    out="$(T ip "$vm" --resolver "$r" 2>/dev/null)" || continue
+    if [[ "$out" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$out" != 169.254.* ]]; then
+      ip="$out"
+      break
+    fi
+  done
+  [[ -n "$ip" ]] || { printf '%-20s %-16s %-34s %s\n' "$vm" "(no address)" - -; continue; }
+
+  # A bridged guest registers itself in DNS; a NAT guest will not resolve.
+  name="$(host "$ip" 2>/dev/null | awk '/domain name pointer/ { sub(/\.$/, "", $NF); print $NF; exit }')"
+  if [[ -n "$name" ]]; then
+    printf '%-20s %-16s %-34s %s\n' "$vm" "$ip" "$name" "vnc://${name}"
+  elif (( nat )); then
+    idx="${vm##*-}"
+    printf '%-20s %-16s %-34s %s\n' "$vm" "$ip" "(NAT; tunnel required)" \
+      "vnc://localhost:$((5900 + idx)) (runner:vnc ${idx})"
+  else
+    printf '%-20s %-16s %-34s %s\n' "$vm" "$ip" "(not in DNS)" "vnc://${ip}"
+  fi
+done
+REMOTE

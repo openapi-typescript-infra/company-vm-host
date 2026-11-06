@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Run tart on the runner host as _ghtart (e.g. mise run runner:tart list)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+as_service_user _ghtart /usr/local/bin/tart "$@"

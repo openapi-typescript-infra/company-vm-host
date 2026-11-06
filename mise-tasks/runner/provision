@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Provision the runner host from envs/<GHRUNNER_ENV>.env (detached; extra args passed through)"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+cd "$REPO_ROOT"
+# -b so an SSH drop mid-provision cannot kill it. You will be prompted for
+# sudo on the host and for the PAT.
+echo "provisioning ${TARGET} from ${CONFIG}"
+exec ./provision.sh -b -c "$CONFIG" "$@" "$TARGET"

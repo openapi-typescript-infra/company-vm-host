@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Keeps the actions used by .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+
+  # Base images of the bundled Linux runner images. Both track an Ubuntu LTS
+  # tag, so a PR here is an LTS-to-LTS move: deliberate, and fine to close
+  # until the next image rebuild is planned. android-image is left out: its
+  # FROM is the Node version synced from mobile-apps through versions.env,
+  # which Dependabot must not move on its own.
+  - package-ecosystem: docker
+    directories:
+      - /remote/linux-image
+      - /remote/linuxvm-image
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+
+# The host tool pins (RUNNER_VERSION, CONTAINER_VERSION, TART_VERSION,
+# LIMA_VERSION in envs/*.env and the shell defaults) are outside every
+# ecosystem Dependabot knows. .github/workflows/pin-bumps.yml covers them:
+# it runs ./check-pins.sh --apply weekly and opens a PR from the result.

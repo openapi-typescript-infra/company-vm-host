@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="List slot daemons on the runner host and whether they are running"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+rsh 'sudo launchctl list | grep com.ghrunner || echo "no ghrunner slot daemons loaded (host disabled, or never provisioned)"'

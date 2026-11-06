@@ -1,0 +1,1 @@
+../../mobile-bake/scripts/20-prime-repo.sh

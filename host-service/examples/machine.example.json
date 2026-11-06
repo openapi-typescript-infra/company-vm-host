@@ -1,0 +1,8 @@
+{
+  "company": "corporation-a",
+  "image": "corporation-a-linux-v1",
+  "tart": "/usr/local/bin/tart",
+  "tartHome": "/var/lib/company-vm-host/machines/corporation-a",
+  "cpus": 4,
+  "memoryMb": 8192
+}

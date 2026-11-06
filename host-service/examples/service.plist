@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.company-vm-host.service</string>
+<key>ProgramArguments</key><array><string>/absolute/path/to/node</string><string>/opt/company-vm-host/src/main.mjs</string><string>/private/host.local.json</string></array>
+<key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+<key>StandardOutPath</key><string>/private/company-host.stdout.log</string>
+<key>StandardErrorPath</key><string>/private/company-host.stderr.log</string>
+</dict></plist>

@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+#MISE description="Persistent macOS VM caches on the host (MACVM_KEEP_CACHES): sizes; 'clear [n]' wipes slot n's; 'seed <from> <to>' clones one slot's onto another; 'rollback <n>' undoes slot n's last promotion"
+source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
+# Layout on the host (see run-slot.sh, macvm): /var/ghrunner/cache/macvm-<n>/
+# holds canonical/ (what the next cycle starts from), work/ (the running
+# cycle's APFS clone of it, the dir shared into the guest) and prev/ (the
+# canonical before the last promotion). All 700 _ghtart, so everything here
+# needs sudo on the host.
+case "${1:-}" in
+  "")
+    # du counts each clonefile'd copy at full size, so canonical + work +
+    # prev overstate what the volume actually holds; the per-store lines
+    # under canonical/ are the meaningful ones.
+    # prev/ and work/ exist only some of the time, so du is allowed to fail
+    # on their globs; only a missing cache dir means there is nothing here.
+    rsh 'sudo sh -c "cd /var/ghrunner/cache 2>/dev/null || { echo \"no macvm caches on this host (MACVM_KEEP_CACHES off, or never provisioned with it)\"; exit 0; }; du -sh macvm-*/canonical/* macvm-*/canonical macvm-*/work macvm-*/prev 2>/dev/null; true"'
+    ;;
+  clear)
+    # Only the contents: the dir itself stays, owned by _ghtart, so the next
+    # cycle starts cold rather than failing. A guest that is mid-job keeps
+    # writing into its work/ clone, which is then discarded or promoted as
+    # usual; the wipe is what later cycles start from.
+    sel="macvm-${2:-*}"
+    echo "clearing /var/ghrunner/cache/${sel} on ${GHRUNNER_HOST}"
+    rsh "sudo sh -c 'for d in /var/ghrunner/cache/${sel}; do [ -d \"\$d\" ] || continue; rm -rf \"\$d\"/canonical \"\$d\"/prev; echo \"cleared \$d\"; done'"
+    ;;
+  seed|rollback)
+    # seed <from> <to>: a slot's share is seeded from the image only, so a
+    # newly provisioned slot starts colder than its siblings (no ccache, no
+    # tool cache, only the image's Gradle stores). This clones one slot's
+    # canonical onto another's. Every store there is content-addressed or
+    # written whole-file-then-rename, so a copy taken while no job runs is a
+    # valid cache, and `cp -c` (APFS clonefile) makes it instant and free of
+    # extra disk until the two diverge.
+    #
+    # rollback <n>: swaps a slot's canonical/ and prev/, i.e. undoes its last
+    # promotion. Run it twice to undo the undo.
+    #
+    # Both refuse while an affected slot is mid-job (GitHub's busy flag, read
+    # with the host's PAT), since the running guest's work/ clone would be
+    # promoted over the change. An idle cycle of the changed slot is stopped
+    # and started again so its next boot clones the new canonical.
+    op="$1"
+    if [[ "$op" == seed ]]; then
+      from="${2:-}"; to="${3:-}"
+      [[ "$from" =~ ^[0-9]+$ && "$to" =~ ^[0-9]+$ ]] \
+        || { echo "usage: mise run runner:caches seed <from-slot> <to-slot>   (e.g. seed 1 2)" >&2; exit 2; }
+      [[ "$from" != "$to" ]] || { echo "from and to are the same slot" >&2; exit 2; }
+      echo "seeding macvm-${to}'s cache from macvm-${from} on ${GHRUNNER_HOST}"
+    else
+      from=""; to="${2:-}"
+      [[ "$to" =~ ^[0-9]+$ ]] \
+        || { echo "usage: mise run runner:caches rollback <slot>   (e.g. rollback 2)" >&2; exit 2; }
+      echo "rolling macvm-${to}'s cache back to its previous canonical on ${GHRUNNER_HOST}"
+    fi
+    # stdin carries the script, so no -t here.
+    ssh -o ConnectTimeout=10 "$TARGET" "sudo bash -s -- '$op' '$from' '$to'" <<'REMOTE'
+set -euo pipefail
+op="$1"; from="$2"; to="$3"
+DST="/var/ghrunner/cache/macvm-${to}"
+die() { echo "error: $*" >&2; exit 1; }
+[[ -d "$DST" ]] || die "$DST does not exist (provision with MACVM_RUNNERS >= ${to} and MACVM_KEEP_CACHES=true first)"
+if [[ "$op" == seed ]]; then
+  SRC="/var/ghrunner/cache/macvm-${from}/canonical"
+  [[ -d "$SRC" && -n "$(ls -A "$SRC")" ]] || die "$SRC is missing or empty; nothing to seed from"
+else
+  [[ -d "$DST/prev" ]] || die "$DST has no prev/ to roll back to (no promotion has happened since the last rollback, clear or provision)"
+fi
+
+# shellcheck disable=SC1091
+source /etc/ghrunner/config.env
+PAT="$(cat /etc/ghrunner/github.pat)"
+prefix="${RUNNER_NAME_PREFIX:-$(hostname -s | tr '[:upper:]' '[:lower:]')}"
+
+# Names of this host's macvm runners GitHub currently reports busy (the
+# same query run-slot.sh uses to protect a job from its idle deadline).
+resp="$(mktemp)"; trap 'rm -f "$resp"' EXIT
+busy_names=""
+for page in 1 2 3; do
+  curl -sS --fail --max-time 30 \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" -o "$resp" \
+    "https://api.github.com/orgs/${GH_ORG}/actions/runners?per_page=100&page=${page}" \
+    || die "could not read the org's runners from GitHub; refusing to touch caches without knowing whether a job is running"
+  count="$(plutil -extract runners raw -o - "$resp" 2>/dev/null || echo 0)"
+  for ((i = 0; i < count; i++)); do
+    [[ "$(plutil -extract "runners.${i}.busy" raw -o - "$resp")" == true ]] || continue
+    busy_names+="$(plutil -extract "runners.${i}.name" raw -o - "$resp")"$'\n'
+  done
+  (( count < 100 )) && break
+done
+for idx in $from $to; do
+  if grep -q "^${prefix}-macvm-${idx}-" <<<"$busy_names"; then
+    die "macvm-${idx} is running a job right now; try again when it is idle (mise run runner:fleet)"
+  fi
+done
+
+label="com.ghrunner.macvm-${to}"
+plist="/Library/LaunchDaemons/${label}.plist"
+was_running=0
+if launchctl list 2>/dev/null | awk -v l="$label" '$3 == l && $1 != "-" { found = 1 } END { exit !found }'; then
+  was_running=1
+  echo "stopping the idle ${label} cycle (its guest holds a clone of the current canonical)"
+  launchctl bootout "system/${label}" 2>/dev/null || true
+  sleep 3
+fi
+# Whatever the stopped cycle had cloned is stale now.
+rm -rf "${DST:?}/work"
+
+if [[ "$op" == seed ]]; then
+  install -d -m 755 -o _ghtart -g staff "$DST/canonical"
+  for src in "$SRC"/*/; do
+    [[ -d "$src" ]] || continue
+    name="$(basename "$src")"
+    rm -rf "${DST:?}/canonical/${name}"
+    # As _ghtart: the share is served to the guest as the tart process's
+    # user, so everything in it must stay owned by it. -p keeps mtimes, which
+    # the guest's Gradle rsync compares.
+    sudo -u _ghtart -H cp -Rpc "$SRC/${name}" "$DST/canonical/${name}"
+    printf '  %-16s %s\n' "$name" "$(du -sh "$DST/canonical/${name}" | cut -f1)"
+  done
+else
+  if [[ -d "$DST/canonical" ]]; then
+    mv "$DST/canonical" "$DST/.swap.$$"
+    mv "$DST/prev" "$DST/canonical"
+    mv "$DST/.swap.$$" "$DST/prev"
+  else
+    mv "$DST/prev" "$DST/canonical"
+  fi
+  echo "  canonical is now the previous promotion; the replaced one is in prev/ (rollback again to swap back)"
+fi
+
+if (( was_running )); then
+  echo "starting ${label} again"
+  [[ -e "$plist" ]] && launchctl bootstrap system "$plist" 2>/dev/null || true
+  launchctl kickstart "system/${label}"
+  echo "its boot log should now say 'syncing gradle in from the share':  mise run runner:logs macvm-${to}"
+else
+  echo "${label} is not running; its next boot picks the change up"
+fi
+REMOTE
+    ;;
+  *)
+    echo "usage: mise run runner:caches [clear [slot] | seed <from-slot> <to-slot> | rollback <slot>]" >&2
+    exit 2
+    ;;
+esac
