@@ -3,7 +3,7 @@
 # resolves without a registry; RUNNER_VERSION is passed in by bootstrap.sh.
 # For an amd64 flavor (LINUX_FLAVOR_<f>_ARCH=amd64), build FROM
 # ghrunner-linux-amd64:${RUNNER_VERSION} instead.
-ARG RUNNER_VERSION=2.337.0
+ARG RUNNER_VERSION=2.338.2
 FROM ghrunner-linux:${RUNNER_VERSION}
 
 USER root

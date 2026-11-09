@@ -41,7 +41,7 @@ fail() { log "ERROR: $*"; sleep 60; exit 1; }
 
 source /etc/ghrunner/config.env
 PAT="$(cat /etc/ghrunner/github.pat)"
-RUNNER_VERSION="${RUNNER_VERSION:-2.337.0}"
+RUNNER_VERSION="${RUNNER_VERSION:-2.338.2}"
 RUNNER_GROUP_ID="${RUNNER_GROUP_ID:-1}"
 
 # Shared kind/label/policy/schedule helpers (fvar, resolve_slot_labels,

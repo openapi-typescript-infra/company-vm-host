@@ -5,7 +5,7 @@
 # Each container serves exactly one job (JIT config) and is then discarded.
 FROM docker.io/library/ubuntu:26.04
 
-ARG RUNNER_VERSION=2.337.0
+ARG RUNNER_VERSION=2.338.2
 # actions/runner tarball arch fragment: arm64 -> arm64, amd64 -> x64.
 ARG RUNNER_ARCH=arm64
 ENV DEBIAN_FRONTEND=noninteractive
