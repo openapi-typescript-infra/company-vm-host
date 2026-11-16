@@ -10,7 +10,7 @@
 # survive it) - prefer multi-arch images, or the linuxvmamd64 slots.
 FROM docker.io/library/ubuntu:26.04
 
-ARG RUNNER_VERSION=2.337.0
+ARG RUNNER_VERSION=2.338.2
 ENV DEBIAN_FRONTEND=noninteractive
 ENV container=container
 

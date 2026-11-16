@@ -18,7 +18,7 @@ FROM docker.io/library/node:${NODE_VERSION}-bookworm
 
 # Build-time knobs that are NOT pins: runner tarball, architecture, and
 # whether to warm the Gradle seed (template|none).
-ARG RUNNER_VERSION=2.337.0
+ARG RUNNER_VERSION=2.338.2
 ARG RUNNER_ARCH=x64
 ARG IMAGE_ARCH=amd64
 ARG GRADLE_PREWARM=template
