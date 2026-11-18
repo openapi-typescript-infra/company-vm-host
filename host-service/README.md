@@ -160,6 +160,13 @@ NAT alone is insufficient for a shared-company deployment.
 
 ## Verification
 
+Run `bash scripts/provision-gcloud.sh` inside a worker while preparing its
+base image. The installer supports Ubuntu and Apple Silicon macOS, installs
+the Google Cloud CLI using Google's APT repository or the Homebrew cask, and
+checks that no active gcloud login is saved in the image. Ubuntu also receives
+the GKE authentication plugin. Verify `gcloud version` from the guest's
+non-login SSH shell before making the image available to the scheduler.
+
 `npm test` uses injected VM drivers and loopback HTTP servers; no model requests,
 GitHub writes, Tart VMs, or host service installation occur. Actual Tart boot,
 Softnet isolation, guest SSH, CI registration and simulator tests require a
