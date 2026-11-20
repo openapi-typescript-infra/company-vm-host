@@ -11,7 +11,7 @@ export ANDROID_SDK_ROOT=$ANDROID_HOME
 HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask android-commandlinetools
 sdkmanager=/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager
 [[ -x "$sdkmanager" ]]
-"$sdkmanager" --sdk_root="$ANDROID_HOME" 'platform-tools' 'platforms;android-37' 'build-tools;37.0.0' 'ndk;27.1.12297006' </dev/null
+"$sdkmanager" --sdk_root="$ANDROID_HOME" 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006' </dev/null
 # Keep the SDK visible in non-login shells and JIT runner sessions.
 sudo ln -sfn "$sdkmanager" /usr/local/bin/sdkmanager
 printf '%s\n' 'export ANDROID_HOME=/opt/android-sdk' 'export ANDROID_SDK_ROOT=/opt/android-sdk'   'export ANDROID_NDK_HOME=/opt/android-sdk/ndk/27.1.12297006' |
