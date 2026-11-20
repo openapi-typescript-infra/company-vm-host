@@ -171,3 +171,13 @@ non-login SSH shell before making the image available to the scheduler.
 GitHub writes, Tart VMs, or host service installation occur. Actual Tart boot,
 Softnet isolation, guest SSH, CI registration and simulator tests require a
 prepared Mac. Tart is not installed in the development environment used here.
+
+For local EAS builds on Apple Silicon, run
+`bash scripts/provision-macos-mobile.sh` as the guest worker user while baking
+the macOS base image. First create a worker-owned `/opt/android-sdk` and copy
+the operator's accepted Android SDK licenses into its `licenses/` directory.
+The script installs platform 37, build-tools 37.0.0, and NDK 27.1.12297006,
+exposes SDK paths to runner shells, imports Apple's public WWDR G3 intermediate,
+and verifies aapt2 and the NDK compiler. If the compiler requires Rosetta,
+install Rosetta in the guest before completing the bake. Signing certificates
+and private keys are supplied by EAS at job time.
