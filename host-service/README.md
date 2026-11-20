@@ -181,3 +181,12 @@ exposes SDK paths to runner shells, imports Apple's public WWDR G3 intermediate,
 and verifies aapt2 and the NDK compiler. If the compiler requires Rosetta,
 install Rosetta in the guest before completing the bake. Signing certificates
 and private keys are supplied by EAS at job time.
+
+After provisioning, run `sudo sync; sudo shutdown -h now` in the guest and
+wait for Tart to exit before cloning the image. Do not publish an image after
+forcing the guest to stop: recently installed files and keychain updates may
+not have reached disk. Before enabling the scheduler, boot a fresh clone and
+check the SDK platform's `android.jar`, aapt2, the NDK compiler, SDK environment
+variables in a non-login SSH shell, and the WWDR G3 certificate in the worker
+user's login keychain. Checking only the running base VM does not verify what
+new workers will receive.
